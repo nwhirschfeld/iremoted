@@ -43,9 +43,6 @@
 #include "ruby.h"
 
 // Include iremoted headers
-#define PROGNAME "iremoted"
-#define PROGVERS "2.0"
-
 #include <stdio.h>
 #include <getopt.h>
 #include <unistd.h>
@@ -77,7 +74,6 @@ VALUE Irrb = Qnil;
 
 // iremoted source
 
-
 IOHIDElementCookie buttonNextID = 0;
 IOHIDElementCookie buttonPreviousID = 0;
 
@@ -106,8 +102,6 @@ void            createHIDDeviceInterface(io_object_t hidDevice,
                                          IOHIDDeviceInterface ***hdi);
 void            setupAndRun(void);
 
-
-
 void
 QueueCallbackFunction(void *target, IOReturn result, void *refcon, void *sender)
 {
@@ -120,11 +114,10 @@ QueueCallbackFunction(void *target, IOReturn result, void *refcon, void *sender)
         hqi = (IOHIDQueueInterface **)sender;
         ret = (*hqi)->getNextEvent(hqi, &event, zeroTime, 0);
         if (!ret) {
-        	if ( event.value )
-        	{
-        		return_val = (UInt32)event.elementCookie;
-
-        	}
+            if ( event.value )
+            {
+                return_val = (UInt32)event.elementCookie;
+            }
             fflush(stdout);
         }
     }
@@ -368,15 +361,15 @@ setupAndRun(void)
 
 // Get Method
 VALUE get_value(VALUE self) {
-	UInt32 x = return_val;
-	return_val = 0;
-	return INT2NUM(x);
+    UInt32 x = return_val;
+    return_val = 0;
+    return INT2NUM(x);
 }
 
 // The initialization method for this module
 void Init_irrb() {
-	Irrb = rb_define_module("Irrb");
-	rb_define_method(Irrb, "get_value", get_value, 0);
-	pthread_t p1;
-	pthread_create (&p1, NULL, (void *)&setupAndRun, NULL);
+    Irrb = rb_define_module("Irrb");
+    rb_define_method(Irrb, "get_value", get_value, 0);
+    pthread_t p1;
+    pthread_create (&p1, NULL, (void *)&setupAndRun, NULL);
 }
