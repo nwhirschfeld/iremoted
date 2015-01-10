@@ -13,6 +13,7 @@ Usage
 -----
 
 Sample Script:
+
     $ ruby testit.rb
     24
     25
@@ -21,6 +22,7 @@ Sample Script:
     ...
 
 In your Ruby-Project:
+
     require 'irrb'
     include Irrb # here starts a backgrounded thread, which stores the last recived value
 
