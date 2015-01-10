@@ -1,10 +1,21 @@
 /*
- * iremoted.c
- * Display events received from the Apple Infrared Remote.
+ * irrb.c
+ * Allows to read events from the Apple Infrared Remote.
  *
- * gcc -Wall -o iremoted iremoted.c -framework IOKit -framework Carbon
+ * Build and Install
+ *-----------------------------------------------------------------------------
+ * $ ruby extconf.rb
+ * $ make
+ * $ make install
+ * 
  *
+ * License
+ *-----------------------------------------------------------------------------
  * Copyright (c) 2006-2008 Amit Singh. All Rights Reserved.
+ *      -> original iremoted.c, see https://github.com/swinton/iremoted
+ *         all functionality
+ * Copyright (c) 2015 Niclas Hirschfeld.
+ *      -> only the wrapper 
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
@@ -28,6 +39,10 @@
  *  SUCH DAMAGE.
  */
 
+ // Include the Ruby headers and goodies
+#include "ruby.h"
+
+// Include iremoted headers
 #define PROGNAME "iremoted"
 #define PROGVERS "2.0"
 
@@ -47,15 +62,21 @@
 #include <IOKit/hid/IOHIDUsageTables.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <Carbon/Carbon.h>
+#include <pthread.h>
 
-static struct option
-long_options[] = {
-    { "help",    no_argument, 0, 'h' },
-    { "keynote", no_argument, 0, 'k' },
-    { 0, 0, 0, 0 },
-};
+// Prototype for the initialization method - Ruby calls this, not you
+void Init_irrb();
 
-static const char *options = "hk";
+// Prototype for our method 'test1' - methods are prefixed by 'method_' here
+VALUE method_test1(VALUE self);
+VALUE get_value(VALUE self);
+void method_test3(VALUE self);
+
+VALUE Irrb = Qnil;
+
+
+// iremoted source
+
 
 IOHIDElementCookie buttonNextID = 0;
 IOHIDElementCookie buttonPreviousID = 0;
@@ -70,19 +91,9 @@ typedef struct cookie_struct
     IOHIDElementCookie gButtonCookie_SystemMenuDown;
 } *cookie_struct_t;
 
-enum {
-    keynoteEventClass = 'Kntc',
-    slideForward      = 'steF',
-    slideBackward     = 'steB',
-};
-
-static const char *keynoteID = "com.apple.iWork.Keynote";
-static int driveKeynote = 0;
+static UInt32 return_val = 0;
 
 void            usage(void);
-OSStatus        KeynoteChangeSlide(AEEventID eventID);
-inline          void print_errmsg_if_io_err(int expr, char *msg);
-inline          void print_errmsg_if_err(int expr, char *msg);
 void            QueueCallbackFunction(void *target, IOReturn result,
                                       void *refcon, void *sender);
 bool            addQueueCallbacks(IOHIDQueueInterface **hqi);
@@ -95,85 +106,7 @@ void            createHIDDeviceInterface(io_object_t hidDevice,
                                          IOHIDDeviceInterface ***hdi);
 void            setupAndRun(void);
 
-void
-usage(void)
-{
-    printf("%s (version %s)\n", PROGNAME, PROGVERS);
-    printf("Copyright (c) 2006-2008 Amit Singh. All Rights Reserved.\n");
-    printf("Displays events received from the Apple Infrared Remote.\n");
-    printf("Usage: %s [OPTIONS...]\n\nOptions:\n", PROGNAME);
-    printf("  -h, --help    print this help message and exit\n");
-    printf("  -k, --keynote use forward/backward button presses for Keynote slide transition\n\n");
-    printf("Please report bugs using the following contact information:\n"
-           "<URL:http://www.osxbook.com/software/bugs/>\n");
-}
 
-OSStatus
-KeynoteChangeSlide(AEEventID eventID)
-{
-    OSStatus     err = noErr;
-    AppleEvent   eventToSend = { typeNull, nil };
-    AppleEvent   eventReply  = { typeNull, nil };
-    AEBuildError eventBuildError;
-
-    err = AEBuildAppleEvent(
-              keynoteEventClass,     // Event class for the resulting event
-              eventID,               // Event ID for the resulting event
-              typeApplicationBundleID,
-              keynoteID,
-              strlen(keynoteID),
-              kAutoGenerateReturnID, // Return ID for the created event
-              kAnyTransactionID,     // Transaction ID for this event
-              &eventToSend,          // Pointer to location for storing result
-              &eventBuildError,      // Pointer to error structure
-              "",                    // AEBuild format string describing the
-              NULL                   // AppleEvent record to be created
-        );
-    if (err != noErr) {
-        fprintf(stderr, "Failed to build Apple event (error %d).\n", (int)err);
-        return err;
-    }
-
-    err = AESend(&eventToSend,
-                 &eventReply,
-                 kAEWaitReply,      // send mode (wait for reply)
-                 kAENormalPriority,
-                 kNoTimeOut,
-                 nil,               // no pointer to idle function
-                 nil);              // no pointer to filter function
-    
-    if (err != noErr)
-        fprintf(stderr, "Failed to send Apple event (error %d).\n", (int)err);
-
-    // Dispose of the send/reply descs
-    AEDisposeDesc(&eventToSend);
-    AEDisposeDesc(&eventReply);
-
-    return err;
-}
-
-inline void
-print_errmsg_if_io_err(int expr, char *msg)
-{
-    IOReturn err = (expr);
-
-    if (err != kIOReturnSuccess) {
-        fprintf(stderr, "*** %s - %s(%x, %d).\n", msg, mach_error_string(err),
-                err, err & 0xffffff);
-        fflush(stderr);
-        exit(EX_OSERR);
-    }
-}
-
-inline void
-print_errmsg_if_err(int expr, char *msg)
-{
-    if (expr) {
-        fprintf(stderr, "*** %s.\n", msg);
-        fflush(stderr);
-        exit(EX_OSERR);
-    }
-}
 
 void
 QueueCallbackFunction(void *target, IOReturn result, void *refcon, void *sender)
@@ -187,15 +120,12 @@ QueueCallbackFunction(void *target, IOReturn result, void *refcon, void *sender)
         hqi = (IOHIDQueueInterface **)sender;
         ret = (*hqi)->getNextEvent(hqi, &event, zeroTime, 0);
         if (!ret) {
-            printf("%#lx %s\n", (UInt32)event.elementCookie,
-                   (event.value == 0) ? "depressed" : "pressed");
+        	if ( event.value )
+        	{
+        		return_val = (UInt32)event.elementCookie;
+
+        	}
             fflush(stdout);
-            if (event.value && driveKeynote) {
-                if (event.elementCookie == buttonNextID)
-                    KeynoteChangeSlide(slideForward);
-                else if (event.elementCookie == buttonPreviousID)
-                    KeynoteChangeSlide(slideBackward);
-            }
         }
     }
 }
@@ -375,8 +305,6 @@ createHIDDeviceInterface(io_object_t hidDevice, IOHIDDeviceInterface ***hdi)
 
     ioReturnValue = IOObjectGetClass(hidDevice, className);
 
-    print_errmsg_if_io_err(ioReturnValue, "Failed to get class name.");
-
     ioReturnValue = IOCreatePlugInInterfaceForService(
                         hidDevice,
                         kIOHIDDeviceUserClientTypeID,
@@ -391,8 +319,6 @@ createHIDDeviceInterface(io_object_t hidDevice, IOHIDDeviceInterface ***hdi)
                         plugInInterface,
                         CFUUIDGetUUIDBytes(kIOHIDDeviceInterfaceID),
                         (LPVOID)hdi);
-    print_errmsg_if_err(plugInResult != S_OK,
-                        "Failed to create device interface.\n");
 
     (*plugInInterface)->Release(plugInInterface);
 }
@@ -411,6 +337,8 @@ setupAndRun(void)
     hidService = IOServiceGetMatchingService(kIOMasterPortDefault,
                                              hidMatchDictionary);
 
+
+
     if (!hidService) {
         fprintf(stderr, "Apple Infrared Remote not found.\n");
         exit(1);
@@ -421,7 +349,6 @@ setupAndRun(void)
     createHIDDeviceInterface(hidDevice, &hidDeviceInterface);
     cookies = getHIDCookies((IOHIDDeviceInterface122 **)hidDeviceInterface);
     ioReturnValue = IOObjectRelease(hidDevice);
-    print_errmsg_if_io_err(ioReturnValue, "Failed to release HID.");
 
     if (hidDeviceInterface == NULL) {
         fprintf(stderr, "No HID.\n");
@@ -438,29 +365,18 @@ setupAndRun(void)
     (*hidDeviceInterface)->Release(hidDeviceInterface);
 }
 
-int
-main (int argc, char **argv)
-{
-    int c, option_index = 0;
 
-    while ((c = getopt_long(argc, argv, options, long_options, &option_index))
-         != -1) {
-        switch (c) {
-        case 'h':
-            usage();
-            exit(0);
-            break;
-        case 'k':
-            driveKeynote = 1;
-            break;
-        default:
-            usage();
-            exit(1);
-            break;
-        }
-    }
+// Get Method
+VALUE get_value(VALUE self) {
+	UInt32 x = return_val;
+	return_val = 0;
+	return INT2NUM(x);
+}
 
-    setupAndRun();
-
-    return 0;
+// The initialization method for this module
+void Init_irrb() {
+	Irrb = rb_define_module("Irrb");
+	rb_define_method(Irrb, "get_value", get_value, 0);
+	pthread_t p1;
+	pthread_create (&p1, NULL, (void *)&setupAndRun, NULL);
 }

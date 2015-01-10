@@ -1,0 +1,8 @@
+
+.RUBYARCHDIR.time
+
+*.bundle
+
+*.o
+
+Makefile
