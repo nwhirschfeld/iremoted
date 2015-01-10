@@ -38,10 +38,13 @@ This extention is just a wrapper for iremoted originally copied from <http://www
 Copyright
 ---------
 Copyright (c) 2006-2008 Amit Singh. All Rights Reserved.
-    -> original iremoted.c, see https://github.com/swinton/iremoted
-       all functionality
+
+ - original iremoted.c, see https://github.com/swinton/iremoted
+ - all functionality
+
 Copyright (c) 2015 Niclas Hirschfeld.
-    -> only the ruby wrapper
+
+ - only the ruby wrapper
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions
