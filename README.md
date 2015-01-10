@@ -1,5 +1,5 @@
-Apple Infrared Remote Daemon - Display events received from the Apple Infrared Remote
-====================================================================================
+Ruby Extention the Apple Infrared Remote - based on iremoted
+=============================================================
 
 Getting started
 ---------------
