@@ -3,29 +3,43 @@ Apple Infrared Remote Daemon - Display events received from the Apple Infrared R
 
 Getting started
 ---------------
-Compile iremoted like so:
+Compile irrb like so:
 
-$ gcc -Wall -o iremoted iremoted.c -framework IOKit -framework Carbon
-
+    $ ruby extconf.rb
+    $ make
+    $ make install
 
 Usage
 -----
-    $ ./iremoted 
-    0x16 pressed 
-    0x16 released 
-    0x17 pressed 
-    0x17 released 
+
+Sample Script:
+    $ ruby testit.rb
+    24
+    25
+    31
+    32
     ...
+
+In your Ruby-Project:
+    require 'irrb'
+    include Irrb # here starts a backgrounded thread, which stores the last recived value
+
+    get_value # last stored value, if 0 it's empty
+              # the last value is stored until someone calls 'get_value' or a new value is recived
 
 For more info, see <http://www.osxbook.com/software/iremoted/>.
 
 Credits
 -------
-This modified version of iremoted originally copied from <http://www.osxbook.com/software/iremoted/>.
+This extention is just a wrapper for iremoted originally copied from <http://www.osxbook.com/software/iremoted/>.
 
 Copyright
 ---------
 Copyright (c) 2006-2008 Amit Singh. All Rights Reserved.
+    -> original iremoted.c, see https://github.com/swinton/iremoted
+       all functionality
+Copyright (c) 2015 Niclas Hirschfeld.
+    -> only the ruby wrapper
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions
