@@ -1,6 +1,8 @@
 Ruby Extention the Apple Infrared Remote - based on iremoted
 =============================================================
 
+![ARemote](https://raw.githubusercontent.com/nwhirschfeld/irrd/master/logo/remote.svg)
+
 Getting started
 ---------------
 Compile irrb like so:
